@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Boat Simulator</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #0a0f1e; font-family: 'Courier New', monospace; }
+      canvas { display: block; }
+
+      #hud {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .key {
+        width: 44px; height: 44px;
+        border: 2px solid rgba(100,200,255,0.5);
+        border-radius: 8px;
+        background: rgba(10,30,60,0.7);
+        color: rgba(100,200,255,0.9);
+        font-size: 18px;
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.1s;
+        user-select: none;
+      }
+      .key.active {
+        background: rgba(100,200,255,0.25);
+        border-color: rgba(100,200,255,1);
+        box-shadow: 0 0 12px rgba(100,200,255,0.6);
+      }
+      #speed-display {
+        position: fixed;
+        top: 20px; right: 24px;
+        color: rgba(100,200,255,0.8);
+        font-size: 13px;
+        text-align: right;
+        letter-spacing: 1px;
+      }
+      #speed-display span {
+        font-size: 28px;
+        font-weight: bold;
+        color: rgba(100,220,255,1);
+      }
+      #title {
+        position: fixed;
+        top: 20px; left: 24px;
+        color: rgba(100,200,255,0.6);
+        font-size: 11px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="title">⚓ Boat Sim</div>
+    <div id="speed-display">VITESSE<br><span id="spd">0.0</span> <small>kn</small></div>
+
+    <div id="hud">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+        <div class="key" id="key-up">▲</div>
+        <div style="display:flex; gap:6px;">
+          <div class="key" id="key-left">◀</div>
+          <div class="key" id="key-down">▼</div>
+          <div class="key" id="key-right">▶</div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
