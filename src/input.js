@@ -9,6 +9,7 @@ export function createInput() {
     bwd: false,  // reculer
     lft: false,  // tourner à gauche
     rgt: false,  // tourner à droite
+    sailorPos: 2, // position du marin : 1=avant, 2=milieu (défaut), 3=arrière
   };
 
   // ── Clavier ──────────────────────────────────
@@ -21,6 +22,10 @@ export function createInput() {
 
   window.addEventListener('keydown', e => {
     if (keyMap[e.key]) input[keyMap[e.key]] = true;
+    // Touches 1/2/3 : position du marin sur le bateau
+    if (e.key === '1') input.sailorPos = 1;
+    if (e.key === '2') input.sailorPos = 2;
+    if (e.key === '3') input.sailorPos = 3;
   });
   window.addEventListener('keyup', e => {
     if (keyMap[e.key]) input[keyMap[e.key]] = false;

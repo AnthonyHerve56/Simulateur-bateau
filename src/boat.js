@@ -3,7 +3,52 @@
 // ─────────────────────────────────────────────
 
 import * as THREE from 'three';
-import { waveHeight } from './water.js';
+import { waveHeight, waveSlope } from './water.js';
+
+// ── Personnage (marin) ─────────────────────────
+function createSailor() {
+  const g = new THREE.Group();
+
+  const matSkin   = new THREE.MeshPhongMaterial({ color: 0xffcc99 });
+  const matCloth  = new THREE.MeshPhongMaterial({ color: 0x1a2e6e }); // pantalon bleu marine
+  const matJacket = new THREE.MeshPhongMaterial({ color: 0xdd3311 }); // ciré rouge/orange
+  const matHat    = new THREE.MeshPhongMaterial({ color: 0xffd700 }); // casquette jaune
+
+  // Tête
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), matSkin);
+  head.position.y = 0.92;
+  g.add(head);
+
+  // Casquette
+  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 8), matHat);
+  hatBrim.position.y = 0.99;
+  g.add(hatBrim);
+  const hatTop = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.14, 8), matHat);
+  hatTop.position.y = 1.09;
+  g.add(hatTop);
+
+  // Torse
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.09, 0.40, 7), matJacket);
+  torso.position.y = 0.57;
+  g.add(torso);
+
+  // Jambes
+  for (const xOff of [-0.068, 0.068]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.040, 0.36, 6), matCloth);
+    leg.position.set(xOff, 0.18, 0);
+    g.add(leg);
+  }
+
+  // Bras
+  for (const xOff of [-0.18, 0.18]) {
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.028, 0.34, 6), matJacket);
+    arm.position.set(xOff, 0.60, 0);
+    arm.rotation.z = xOff > 0 ? -0.35 : 0.35;
+    g.add(arm);
+  }
+
+  return g;
+}
 
 // ── Helpers géométrie ──────────────────────────
 function makeTriangle(ax, ay, az, bx, by, bz, cx, cy, cz) {
@@ -140,6 +185,22 @@ export function createBoat(scene) {
   );
   jibGroup.add(jib);
 
+  // ── Marin + positions ──
+  // Position en Z local du groupe bateau (axe avant = −Z)
+  const SAILOR_POSITIONS = [
+    { x: 0, z: -1.5 },  // 1 : avant (proue)
+    { x: 0, z: -0.1 },  // 2 : milieu (défaut)
+    { x: 0, z:  1.2 },  // 3 : arrière (cockpit)
+  ];
+
+  const sailor = createSailor();
+  sailor.position.set(
+    SAILOR_POSITIONS[1].x,
+    DECK_Y + 0.02,
+    SAILOR_POSITIONS[1].z,
+  );
+  group.add(sailor);
+
   // ── État physique du bateau ──
   // C'est l'objet que les autres modules (main, wake…) lisent
   const state = {
@@ -162,19 +223,24 @@ export function createBoat(scene) {
     const effectiveMax = state.maxSpeed * wFactor;
 
     // Accélération / décélération
-    if (input.fwd) {
+    if (input.fwd && effectiveMax > 0) {
+      // On ne peut accélérer que si le vent le permet
       state.speed = Math.min(state.speed + state.accel * dt, effectiveMax);
-      // Si le vent de face bride effectiveMax, freiner activement vers 0
-      if (state.speed > effectiveMax) {
-        state.speed = Math.max(effectiveMax, state.speed - state.decel * 2 * dt);
-      }
     } else if (input.bwd) {
       state.speed = Math.max(state.speed - state.accel * dt, -state.maxSpeed * 0.4);
     } else {
-      // Résistance de l'eau (drag) + freinage vent de face
-      const drag = effectiveMax === 0 ? state.decel * 3 : state.decel;
-      if (state.speed > 0) state.speed = Math.max(0, state.speed - drag * dt);
+      // Résistance de l'eau (drag)
+      if (state.speed > 0) state.speed = Math.max(0, state.speed - state.decel * dt);
       else                 state.speed = Math.min(0, state.speed + state.decel * dt);
+    }
+
+    // Freinage progressif si la vitesse dépasse le max autorisé par le vent
+    // (ralentissement en 2–3 s selon l'angle : plus on est face au vent, plus c'est fort)
+    if (state.speed > effectiveMax) {
+      const headwindBrake = effectiveMax === 0
+        ? state.decel * 2.5                    // vent de face : freine fort
+        : state.decel * 1.2;                   // vent défavorable partiel : freine doucement
+      state.speed = Math.max(effectiveMax, state.speed - headwindBrake * dt);
     }
 
     // Direction (plus on va vite, plus on tourne bien)
@@ -189,17 +255,37 @@ export function createBoat(scene) {
     // Hauteur de l'eau sous le bateau
     state.waterHeight = waveHeight(state.x, state.z, t);
 
+    // ── Pente des vagues sous le bateau ──
+    const { sx, sz } = waveSlope(state.x, state.z, t);
+    const sinA = Math.sin(state.angle);
+    const cosA = Math.cos(state.angle);
+    // Projection sur l'axe avant du bateau (forward = [-sinA, 0, -cosA])
+    const slopeFwd  = sx * (-sinA) + sz * (-cosA);
+    // Projection sur l'axe latéral (right = [cosA, 0, -sinA])
+    const slopeRight = sx * cosA   + sz * (-sinA);
+
+    // Légère résistance en montée de vague
+    state.speed -= slopeFwd * state.speed * 1.8 * dt;
+
     // Appliquer la position au groupe 3D
     group.position.set(state.x, state.waterHeight + 0.1, state.z);
     group.rotation.y = state.angle;
 
-    // Roulis dans les virages
-    const targetRoll  = (input.rgt ? 1 : input.lft ? -1 : 0) * 0.08 * turnFactor;
-    group.rotation.z  = THREE.MathUtils.lerp(group.rotation.z, targetRoll, 0.1);
+    // Roulis : virages + inclinaison latérale de la vague
+    const targetRoll  = (input.rgt ? 1 : input.lft ? -1 : 0) * 0.08 * turnFactor
+                      - slopeRight * 1.4;
+    group.rotation.z  = THREE.MathUtils.lerp(group.rotation.z, targetRoll, 0.12);
 
-    // Tangage selon la vitesse
-    const targetPitch = -(state.speed / state.maxSpeed) * 0.06;
-    group.rotation.x  = THREE.MathUtils.lerp(group.rotation.x, targetPitch, 0.05);
+    // Tangage : vitesse + pente longitudinale de la vague
+    const targetPitch = -(state.speed / state.maxSpeed) * 0.06 + slopeFwd * 1.2;
+    group.rotation.x  = THREE.MathUtils.lerp(group.rotation.x, targetPitch, 0.10);
+
+    // ── Position du marin ──
+    if (input.sailorPos >= 1 && input.sailorPos <= 3) {
+      const tgt = SAILOR_POSITIONS[input.sailorPos - 1];
+      sailor.position.x = THREE.MathUtils.lerp(sailor.position.x, tgt.x, 0.07);
+      sailor.position.z = THREE.MathUtils.lerp(sailor.position.z, tgt.z, 0.07);
+    }
 
     // ── Orientation des voiles selon le vent ──
     if (wind) {

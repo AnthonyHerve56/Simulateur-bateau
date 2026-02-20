@@ -33,7 +33,7 @@ function animate() {
   prevTime  = now;
 
   // Mise à jour de chaque module
-  water.update(t);
+  water.update(t, camera);
   wind.update(dt);
   boat.update(input, dt, t, water, wind);
   wake.update(boat.state, dt, t, water);
