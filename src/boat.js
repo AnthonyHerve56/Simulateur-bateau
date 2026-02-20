@@ -316,5 +316,5 @@ export function createBoat(scene) {
     }
   }
 
-  return { group, state, update };
+  return { group, state, update, sailor };
 }
